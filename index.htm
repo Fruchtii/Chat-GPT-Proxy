@@ -14,7 +14,7 @@
             background-color: #f0f0f0;
             color: #333;
         }
-        h1 {
+        h1, h2 {
             color: #2c3e50;
             text-align: center;
         }
@@ -70,6 +70,17 @@
         .ai-message {
             background-color: #e3f2fd;
         }
+        #apiLinks {
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+        #apiLinks a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        #apiLinks a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -77,6 +88,19 @@
     <div id="apiKeySection">
         <input type="password" id="apiKey" placeholder="Enter API Key">
         <button onclick="saveApiKey()">Save API Key</button>
+        <div id="apiLinks">
+            Get API keys: 
+            <a href="https://platform.openai.com/api-keys" target="_blank">ChatGPT/DALL-E</a> | 
+            <a href="https://www.anthropic.com" target="_blank">Claude 3.5 Sonnet</a>
+        </div>
+    </div>
+    <h2>Select AI Model:</h2>
+    <div style="text-align: center; margin-bottom: 20px;">
+        <select id="modelSelect" onchange="updateApiEndpoint()">
+            <option value="gpt-3.5-turbo">ChatGPT (GPT-3.5 Turbo)</option>
+            <option value="dall-e">DALL-E (Image Generation)</option>
+            <option value="claude-3-sonnet">Claude 3.5 Sonnet</option>
+        </select>
     </div>
     <div id="chatbox"></div>
     <input type="text" id="userInput" placeholder="Enter your message...">
@@ -84,11 +108,17 @@
 
     <script>
         let apiKey = '';
+        let currentModel = 'gpt-3.5-turbo';
 
         function saveApiKey() {
             apiKey = document.getElementById('apiKey').value;
             document.getElementById('apiKey').value = '';
             alert('API Key saved!');
+        }
+
+        function updateApiEndpoint() {
+            currentModel = document.getElementById('modelSelect').value;
+            document.getElementById('userInput').placeholder = currentModel === 'dall-e' ? "Describe the image you want to generate..." : "Enter your message...";
         }
 
         async function sendMessage() {
@@ -98,18 +128,59 @@
 
             displayMessage('User: ' + message, 'user-message');
 
-            try {
-                const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-                    model: "gpt-3.5-turbo",
-                    messages: [{ role: "user", content: message }]
-                }, {
-                    headers: {
+            let apiEndpoint, requestData, headers;
+
+            switch(currentModel) {
+                case 'gpt-3.5-turbo':
+                    apiEndpoint = 'https://api.openai.com/v1/chat/completions';
+                    requestData = {
+                        model: "gpt-3.5-turbo",
+                        messages: [{ role: "user", content: message }]
+                    };
+                    headers = {
                         'Authorization': `Bearer ${apiKey}`,
                         'Content-Type': 'application/json'
-                    }
-                });
+                    };
+                    break;
+                case 'dall-e':
+                    apiEndpoint = 'https://api.openai.com/v1/images/generations';
+                    requestData = {
+                        prompt: message,
+                        n: 1,
+                        size: "1024x1024"
+                    };
+                    headers = {
+                        'Authorization': `Bearer ${apiKey}`,
+                        'Content-Type': 'application/json'
+                    };
+                    break;
+                case 'claude-3-sonnet':
+                    apiEndpoint = 'https://api.anthropic.com/v1/messages';
+                    requestData = {
+                        model: "claude-3-sonnet-20240229",
+                        messages: [{ role: "user", content: message }],
+                        max_tokens: 1000
+                    };
+                    headers = {
+                        'x-api-key': apiKey,
+                        'anthropic-version': '2023-06-01',
+                        'Content-Type': 'application/json'
+                    };
+                    break;
+            }
 
-                const aiResponse = response.data.choices[0].message.content;
+            try {
+                const response = await axios.post(apiEndpoint, requestData, { headers });
+                let aiResponse;
+
+                if (currentModel === 'dall-e') {
+                    aiResponse = `<img src="${response.data.data[0].url}" alt="Generated image" style="max-width: 100%;">`;
+                } else if (currentModel === 'claude-3-sonnet') {
+                    aiResponse = response.data.content[0].text;
+                } else {
+                    aiResponse = response.data.choices[0].message.content;
+                }
+
                 displayMessage('AI: ' + aiResponse, 'ai-message');
             } catch (error) {
                 console.error('Error:', error);
@@ -121,7 +192,7 @@
             const chatbox = document.getElementById('chatbox');
             const messageElement = document.createElement('div');
             messageElement.className = `message ${className}`;
-            messageElement.innerText = message;
+            messageElement.innerHTML = message;
             chatbox.appendChild(messageElement);
             chatbox.scrollTop = chatbox.scrollHeight;
         }
