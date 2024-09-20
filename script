@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KI-Proxy</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        #chatbox { height: 300px; border: 1px solid #ccc; overflow-y: scroll; margin-bottom: 10px; padding: 10px; }
+        #userInput { width: 70%; }
+        #sendButton { width: 28%; }
+    </style>
+</head>
+<body>
+    <h1>KI-Proxy</h1>
+    <input type="password" id="apiKey" placeholder="API-Schlüssel eingeben">
+    <button onclick="saveApiKey()">API-Schlüssel speichern</button>
+    <div id="chatbox"></div>
+    <input type="text" id="userInput" placeholder="Nachricht eingeben...">
+    <button id="sendButton" onclick="sendMessage()">Senden</button>
+
+    <script>
+        let apiKey = '';
+
+        function saveApiKey() {
+            apiKey = document.getElementById('apiKey').value;
+            document.getElementById('apiKey').value = '';
+            alert('API-Schlüssel gespeichert!');
+        }
+
+        async function sendMessage() {
+            const userInput = document.getElementById('userInput');
+            const message = userInput.value;
+            userInput.value = '';
+
+            displayMessage('User: ' + message);
+
+            try {
+                const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+                    model: "gpt-3.5-turbo",
+                    messages: [{ role: "user", content: message }]
+                }, {
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const aiResponse = response.data.choices[0].message.content;
+                displayMessage('KI: ' + aiResponse);
+            } catch (error) {
+                console.error('Fehler:', error);
+                displayMessage('Fehler: Konnte keine Antwort von der KI erhalten.');
+            }
+        }
+
+        function displayMessage(message) {
+            const chatbox = document.getElementById('chatbox');
+            chatbox.innerHTML += message + '<br>';
+            chatbox.scrollTop = chatbox.scrollHeight;
+        }
+    </script>
+</body>
+</html>
